@@ -561,6 +561,12 @@
                 </select>
             </label>
             <label><input type="checkbox" id="settingDragSubtitle" disabled><span> Drag subtitle up and down (Not Implemented)</span></label>
+            <h2>Audio Settings</h2>
+            <label>
+                <span>Volume Boost</span>
+                <input type="range" id="volumeBoostSlider" min="1" max="5" step="0.1" value="1">
+                <span id="volumeBoostValue">1.0x</span>
+            </label>
             <button id="saveSettingsBtn">OK</button>
         </div>
     </div>
@@ -569,7 +575,34 @@
         document.addEventListener('DOMContentLoaded', () => {
             const videoElement = document.getElementById('myVideo');
             const audioElement = document.getElementById('myAudio');
-            let activeMediaElement = null; 
+            let activeMediaElement = null;
+            
+            // Web Audio API for volume boost
+            let audioContext = null;
+            let mediaSource = null;
+            let gainNode = null;
+            let isAudioContextInitialized = false;
+            
+            // Load saved volume preference
+            const savedVolume = localStorage.getItem('userVolume');
+            const savedVolumeBoost = localStorage.getItem('volumeBoost') || 1;
+            
+            // Function to load user preferences
+            function loadUserPreferences() {
+                // Load volume preference
+                if (savedVolume !== null) {
+                    const volume = parseFloat(savedVolume);
+                    volumeSlider.value = volume;
+                    if (activeMediaElement) {
+                        activeMediaElement.volume = Math.min(1, volume);
+                        if (volume > 1 && audioContext && gainNode) {
+                            gainNode.gain.value = volume;
+                        }
+                    }
+                    updateVolumeIcon(volume);
+                }
+            }
+            
 
             const mediaContainer = document.getElementById('mediaContainer');
             const playPauseBtn = document.getElementById('playPauseBtn');
@@ -661,8 +694,27 @@
             const settingDoubleTapSeek = document.getElementById('settingDoubleTapSeek');
             const settingDoubleTapPlayPause = document.getElementById('settingDoubleTapPlayPause');
             const longPressSpeedSelect = document.getElementById('settingLongPressSpeedValue');
+            const volumeBoostSlider = document.getElementById('volumeBoostSlider');
+            const volumeBoostValue = document.getElementById('volumeBoostValue');
             
             let currentLongPressSetting = longPressSpeedSelect ? parseFloat(longPressSpeedSelect.value) : 0;
+            
+            // Initialize volume boost slider
+            if (volumeBoostSlider && volumeBoostValue) {
+                volumeBoostSlider.value = savedVolumeBoost;
+                volumeBoostValue.textContent = savedVolumeBoost + 'x';
+                
+                volumeBoostSlider.addEventListener('input', (e) => {
+                    const boostValue = parseFloat(e.target.value);
+                    volumeBoostValue.textContent = boostValue.toFixed(1) + 'x';
+                    
+                    if (gainNode) {
+                        gainNode.gain.value = boostValue;
+                    }
+                    
+                    localStorage.setItem('volumeBoost', boostValue);
+                });
+            }
 
             if (longPressSpeedSelect) {
                 longPressSpeedSelect.addEventListener('change', () => {
@@ -715,6 +767,42 @@
                 }
             }
 
+            // Setup Audio Context for volume boost
+            function setupAudioContext() {
+                if (!audioContext && !isAudioContextInitialized) {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        gainNode = audioContext.createGain();
+                        gainNode.gain.value = parseFloat(savedVolumeBoost) || 1; // Use saved boost value
+                        gainNode.connect(audioContext.destination);
+                        isAudioContextInitialized = true;
+                    } catch (e) {
+                        console.error('Web Audio API is not supported in this browser', e);
+                        isAudioContextInitialized = true; // Mark as initialized to prevent further attempts
+                    }
+                }
+            }
+
+            function connectMediaElementToAudioContext(mediaEl) {
+                if (!audioContext || !isAudioContextInitialized) return;
+                
+                // Disconnect previous source if exists
+                if (mediaSource) {
+                    try {
+                        mediaSource.disconnect();
+                    } catch (e) {
+                        // Ignore disconnection errors
+                    }
+                }
+                
+                try {
+                    mediaSource = audioContext.createMediaElementSource(mediaEl);
+                    mediaSource.connect(gainNode);
+                } catch (e) {
+                    console.error('Failed to connect media element to audio context', e);
+                }
+            }
+            
             function setupMediaEventListeners(mediaEl) {
                 mediaEl.addEventListener('loadedmetadata', () => {
                     if (!activeMediaElement || activeMediaElement !== mediaEl) return;
@@ -829,10 +917,27 @@
                 else if (activeMediaElement.muted) updateVolumeSliderFill();
             });
 
+            // Function to update volume icon based on volume level
+            function updateVolumeIcon(volume) {
+                if (volume === 0) {
+                    volumeIcon.className = 'fas fa-volume-mute';
+                } else if (volume < 0.5) {
+                    volumeIcon.className = 'fas fa-volume-down';
+                } else {
+                    volumeIcon.className = 'fas fa-volume-up';
+                }
+            }
+
             volumeSlider.addEventListener('input', (e) => {
                 if (!activeMediaElement) return;
-                activeMediaElement.volume = e.target.value;
-                activeMediaElement.muted = e.target.value === "0";
+                const volume = parseFloat(e.target.value);
+                activeMediaElement.volume = Math.min(1, volume); // Ensure standard volume doesn't exceed 1
+                activeMediaElement.muted = volume === 0;
+                
+                // Save volume preference
+                localStorage.setItem('userVolume', volume);
+                
+                updateVolumeIcon(volume);
                 updateVolumeSliderFill();
             });
 
@@ -858,6 +963,9 @@
                     }
                     
                     const fileURL = URL.createObjectURL(file);
+
+                    // Setup audio context for volume boost
+                    setupAudioContext();
 
                     if (file.type.startsWith('video/')) {
                         activeMediaElement = videoElement;
@@ -886,6 +994,10 @@
 
                     activeMediaElement.src = fileURL;
                     activeMediaElement.load();
+                    
+                    // Connect to audio context for volume boost
+                    connectMediaElementToAudioContext(activeMediaElement);
+                    
                     activeMediaElement.play().catch(error => console.log("Autoplay prevented:", error));
                 }
             });
