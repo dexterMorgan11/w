@@ -838,8 +838,9 @@
 
             playbackSpeedSelect.addEventListener('change', (e) => {
                 if (!activeMediaElement) return;
-                activeMediaElement.playbackRate = parseFloat(e.target.value);
-                originalPlaybackRate = activeMediaElement.playbackRate;
+                const rate = parseFloat(e.target.value);
+                activeMediaElement.playbackRate = rate;
+                originalPlaybackRate = rate; // Sync with UI changes
             });
 
             fullscreenBtn.addEventListener('click', toggleFullscreen);
@@ -1041,10 +1042,10 @@
 
             function handleMouseDown(event) {
                 if (!activeMediaElement || !activeMediaElement.src || activeMediaElement.src === window.location.href || activeMediaElement.paused || currentLongPressSetting === 0) return;
-                originalPlaybackRate = activeMediaElement.playbackRate;
+                originalPlaybackRate = activeMediaElement.playbackRate; // Capture current rate
                 longPressTimer = setTimeout(() => {
                     if (activeMediaElement && currentLongPressSetting !== 0) {
-                        activeMediaElement.playbackRate = currentLongPressSetting;
+                        activeMediaElement.playbackRate = currentLongPressSetting; // Apply fast speed
                     }
                 }, 500);
             }
@@ -1052,7 +1053,7 @@
             function handleMouseUp() {
                 clearTimeout(longPressTimer);
                 if (activeMediaElement && currentLongPressSetting !== 0 && activeMediaElement.playbackRate === currentLongPressSetting) {
-                    activeMediaElement.playbackRate = originalPlaybackRate;
+                    activeMediaElement.playbackRate = originalPlaybackRate; // Restore original
                 }
             }
             
