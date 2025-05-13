@@ -587,6 +587,72 @@
             const controlsOverlay = document.getElementById('controlsOverlay');
             const centerPlayOverlay = document.getElementById('centerPlayOverlay');
 
+            // Add variables for controls auto-hide
+            let controlsTimeout;
+            const CONTROLS_HIDE_DELAY = 3000; // 3 seconds
+            let isFullscreen = false;
+
+            // Function to hide controls
+            function hideControls() {
+                if (!activeMediaElement?.paused) {
+                    controlsOverlay.style.opacity = '0';
+                    if (isFullscreen) {
+                        // Hide cursor in fullscreen mode when controls are hidden
+                        mediaContainer.style.cursor = 'none';
+                    }
+                }
+            }
+
+            // Function to show controls
+            function showControls() {
+                controlsOverlay.style.opacity = '1';
+                mediaContainer.style.cursor = 'default';
+                // Reset the timer
+                clearTimeout(controlsTimeout);
+                controlsTimeout = setTimeout(hideControls, CONTROLS_HIDE_DELAY);
+            }
+
+            // Add mouse move event listener to the media container
+            mediaContainer.addEventListener('mousemove', showControls);
+            mediaContainer.addEventListener('mouseenter', showControls);
+            mediaContainer.addEventListener('mouseleave', () => {
+                if (!activeMediaElement?.paused) {
+                    hideControls();
+                }
+            });
+
+            // Show controls when video is paused
+            function handlePlayPause() {
+                if (activeMediaElement?.paused) {
+                    showControls();
+                    clearTimeout(controlsTimeout);
+                    mediaContainer.style.cursor = 'default';
+                } else {
+                    controlsTimeout = setTimeout(hideControls, CONTROLS_HIDE_DELAY);
+                }
+            }
+
+            // Update fullscreen state
+            document.addEventListener('fullscreenchange', () => {
+                isFullscreen = !!document.fullscreenElement;
+                if (!isFullscreen) {
+                    mediaContainer.style.cursor = 'default';
+                }
+                showControls();
+            });
+
+            // Add to your existing play/pause click handler
+            playPauseBtn.addEventListener('click', () => {
+                togglePlayPause();
+                handlePlayPause();
+            });
+
+            // Add CSS transition for smooth fade
+            controlsOverlay.style.transition = 'opacity 0.3s ease-in-out';
+
+            // Initialize controls visibility
+            showControls();
+
             const settingsBtn = document.getElementById('settingsBtn');
             const settingsModal = document.getElementById('settingsModal');
             const closeSettingsModalBtn = document.getElementById('closeSettingsModal');
