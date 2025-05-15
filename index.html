@@ -57,6 +57,12 @@
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            -webkit-touch-callout: none; /* iOS Safari */
+            -webkit-user-select: none; /* Safari */
+            -khtml-user-select: none; /* Konqueror HTML */
+            -moz-user-select: none; /* Old versions of Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
         }
         .media-container.is-video {
             aspect-ratio: 16 / 9;
@@ -684,6 +690,10 @@
                     hideControls();
                 }
             });
+
+            // Prevent default context menu (e.g., on long press on mobile)
+            mediaContainer.addEventListener('contextmenu', e => e.preventDefault());
+
 
             function handlePlayPauseEvt() { // Renamed to avoid conflict
                 if (activeMediaElement?.paused) {
